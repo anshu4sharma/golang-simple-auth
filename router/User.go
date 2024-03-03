@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 	"github.com/gofiber/fiber/v2"
+	// "github.com/gofiber/fiber/v2/middleware/logger"
 	"go.mongodb.org/mongo-driver/bson"
 	// "go.mongodb.org/mongo-driver/mongo"
 	// "go.mongodb.org/mongo-driver/bson/primitive"
@@ -49,18 +50,26 @@ func login(c *fiber.Ctx) error {
 	}
 	coll := common.GetDBCollection("users")
 	user := models.User{}
-	err := coll.FindOne(c.Context(), bson.M{"email": b.Email, "password": b.Password}).Decode(&user)
+	err := coll.FindOne(c.Context(), bson.M{"email": b.Email}).Decode(&user)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"error":   "User not found !",
-			"message": err.Error(),
 		})
 	}
+
+	match := common.CheckPasswordHash(b.Password, user.Password)
+
+	if !match {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Invalid Credentials !",
+		})
+	}
+
 	// Create the Claims
 	claims := jwt.MapClaims{
 		"email": user.Email,
 		"id":    user.ID,
-		"exp":   time.Now().Add(time.Hour * 72).Unix(),
+		"exp":   time.Now().Add(time.Minute * 60).Unix(),
 	}
 
 	// Create token
@@ -73,7 +82,6 @@ func login(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"token": t})
-
 }
 
 func signup(c *fiber.Ctx) error {
@@ -90,16 +98,28 @@ func signup(c *fiber.Ctx) error {
 	user := models.User{}
 	errExist := coll.FindOne(c.Context(), bson.M{"email": b.Email}).Decode(&user)
 	if errExist == nil {
-        // User with the same email already exists
-        return c.Status(409).JSON(fiber.Map{
-            "error":   "User already exists",
-            "message": "A user with the same email already exists",
-        })
-    }
-	result, err := coll.InsertOne(c.Context(), b)
+		// User with the same email already exists
+		return c.Status(409).JSON(fiber.Map{
+			"error":   "User already exists",
+		})
+	}
+
+	hashedPassword, err := common.HashPassword(b.Password)
+
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
-			"error":   "Failed to create User",
+			"error":   "Failed to Signup",
+			"message": err.Error(),
+		})
+	}
+
+	b.Password = hashedPassword
+
+	result, err := coll.InsertOne(c.Context(), b)
+
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error":   "Failed to Signup",
 			"message": err.Error(),
 		})
 	}
