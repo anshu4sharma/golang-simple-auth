@@ -1,13 +1,13 @@
 package main
 
 import (
-	"golang-simple-auth/common"
-	"golang-simple-auth/router"
-	"os"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"golang-simple-auth/common"
+	"golang-simple-auth/router"
+	"os"
 )
 
 func main() {
@@ -44,6 +44,7 @@ func run() error {
 
 	// add routes
 	router.AddUserGroup(app)
+
 
 	// start server
 	var port string
